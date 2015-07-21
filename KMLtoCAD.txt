@@ -1,0 +1,55 @@
+# Requires three variable boxes in the tool builder (KML folder, Output DGN folder, and Output DGN coordinate system).
+
+# Import modules
+
+import arcpy, os, sys
+
+# Set workspace
+
+arcpy.env.workspace = arcpy.GetParameterAsText(0)
+
+arcpy.env.overwriteOutput = True
+
+# Set intermediate staging location
+
+lyrFldr = arcpy.env.workspace+"/lyrstaging"
+if not os.path.exists(lyrFldr):
+    os.makedirs(lyrFldr)
+
+# Set output CAD parameters
+cadFldr = arcpy.GetParameterAsText(1)
+arcpy.env.outputCoordinateSystem = arcpy.GetParameterAsText(2)
+outputType = "DGN_V8"
+
+# Find KML/KMZ and Convert to lyr files
+
+for kmz in arcpy.ListFiles('*.KM*'):
+    print "Converting " + os.path.join(arcpy.env.workspace, kmz) + " to lyr files."
+    arcpy.AddMessage("Converting " + kmz + " to lyr files.")
+    try:
+        arcpy.KMLToLayer_conversion(kmz, lyrFldr)
+    except:
+        arcpy.GetMessages()
+        arcpy.AddMessage("KML conversion failed.")
+
+# Convert lyr files to CAD
+
+arcpy.env.workspace = lyrFldr
+
+for gdbSpace in arcpy.ListWorkspaces('','FileGDB'):
+    arcpy.env.workspace = gdbSpace
+    fileName = (os.path.basename(gdbSpace))[:-4]
+    for fds in arcpy.ListDatasets('*','Feature'):
+        for fc in arcpy.ListFeatureClasses('','',fds):
+            inputLyr = os.path.join(gdbSpace, fds, fc)
+            outputDGN = cadFldr+"/"+fileName+"_"+fc+".dgn"
+            try:            
+                arcpy.AddMessage("Converting "+fds+"/"+fc)       
+                arcpy.ExportCAD_conversion(inputLyr, outputType, outputDGN, "USE_FILENAMES_IN_TABLES", "OVERWRITE_EXISTING_FILES", "")
+                arcpy.AddMessage("Conversion successful.")
+            except:
+                arcpy.AddMessage("Conversion failed.")
+
+
+
+
